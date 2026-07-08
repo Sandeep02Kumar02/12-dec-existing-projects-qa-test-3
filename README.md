@@ -20,13 +20,13 @@ A minimal Node.js HTTP server that returns a constant `Hello, World!` response f
 
 ## Overview
 
-`hello_world` is a minimal HTTP server built exclusively on the Node.js core `http` module (Source: server.js:6). It listens on the loopback interface and responds to **every** incoming request — regardless of HTTP method or path — with an HTTP `200` status, a `text/plain` content type, and the body `Hello, World!\n` (Source: server.js:28-32). The project has **zero third-party dependencies** (Source: package-lock.json). It serves as a minimal reference implementation of a Node.js HTTP server.
+`hello_world` is a minimal HTTP server built exclusively on the Node.js core `http` module (Source: server.js:6). It listens on the loopback interface and responds to **every** incoming request — regardless of HTTP method or path — with an HTTP `200` status, a `text/plain` content type, and the body `Hello, World!\n` (Source: server.js:28-32). Per the HTTP specification, a `HEAD` request receives the same status and header but no body (see [API Documentation](#api-documentation) for details). The project has **zero third-party dependencies** (Source: package-lock.json). It serves as a minimal reference implementation of a Node.js HTTP server.
 
 ## Features
 
 - **Single-file server** — the entire application lives in `server.js` (Source: server.js:1-42).
 - **Zero dependencies** — uses only the Node.js core `http` module; no external packages are installed (Source: server.js:6; package-lock.json).
-- **Constant plain-text response** — returns `200 OK` with the body `Hello, World!\n` for any method and any path; the request is never inspected (Source: server.js:28-32).
+- **Constant plain-text response** — returns `200 OK` with the body `Hello, World!\n` for any method and any path (a `HEAD` request receives the same status and headers with no body, per the HTTP specification); the request is never inspected (Source: server.js:28-32).
 - **Loopback binding** — listens on `127.0.0.1:3000` (Source: server.js:12, server.js:17).
 
 ## Tech Stack
@@ -75,15 +75,17 @@ Server running at http://127.0.0.1:3000/
 
 ## API Documentation
 
-The server exposes a single behavior: it answers **every** request identically. It does not inspect the request, so the HTTP method, path, query string, and body are all ignored (Source: server.js:28-32).
+The server exposes a single behavior: the request handler runs identically for **every** request. It does not inspect the request, so the HTTP method, path, query string, and body are all ignored (Source: server.js:28-32). Every response carries an HTTP `200` status and a `Content-Type: text/plain` header; every method except `HEAD` also returns the `Hello, World!\n` body (see the `HEAD` note below).
 
 ### Endpoint Reference
 
 | Method | Path | Status | Content-Type | Response Body |
 |--------|------|--------|--------------|----------------|
-| `ANY` | `/*` (any path) | `200 OK` | `text/plain` | `Hello, World!\n` |
+| `ANY` | `/*` (any path) | `200 OK` | `text/plain` | `Hello, World!\n` (empty for `HEAD` — see note) |
 
 _Source: server.js:28-32_
+
+> **`HEAD` requests:** A `HEAD` response returns the same `200` status and `Content-Type: text/plain` header as the other methods, but with **no message body** and **no `Content-Length`** header. The request handler is identical for every method (Source: server.js:28-32); per the HTTP specification, the Node.js `http` runtime omits the body — and the `Content-Length` derived from it — from `HEAD` responses. All other methods (`GET`, `POST`, `PUT`, `DELETE`, `PATCH`, …) return the full `Hello, World!\n` body with `Content-Length: 14`. Verify with `curl -I http://127.0.0.1:3000/`.
 
 ### Example Request
 
