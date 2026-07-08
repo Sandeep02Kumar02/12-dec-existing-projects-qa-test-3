@@ -54,7 +54,7 @@ cd hello_world
 npm install
 ```
 
-`npm install` completes without installing anything because the project has **zero dependencies** (Source: package-lock.json); the step is included only for convention.
+`npm install` completes without installing anything because the project has **zero dependencies** (Source: package-lock.json).
 
 ## Running the Server
 
@@ -113,7 +113,7 @@ sequenceDiagram
     participant C as HTTP Client (curl / browser)
     participant S as server.js (127.0.0.1:3000)
     C->>S: Any request (any method, any path)
-    S->>S: statusCode = 200; Content-Type text/plain
+    S->>S: statusCode = 200#59; Content-Type text/plain
     S-->>C: 200 OK — "Hello, World!"
 ```
 
@@ -207,7 +207,7 @@ npm test
 # Error: no test specified
 ```
 
-Running `npm test` fails by design. There is no test suite to execute, and adding one is outside the scope of this documentation.
+Running `npm test` fails by design. There is no test suite to execute.
 
 ## License
 
