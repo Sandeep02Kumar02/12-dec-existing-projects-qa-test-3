@@ -41,10 +41,10 @@ A minimal Node.js HTTP server that returns a constant `Hello, World!` response f
 
 | Requirement | Notes |
 |-------------|-------|
-| Node.js | A current LTS release (for example, Node.js 18+; verified on 22.x). The project does not pin an engine version in `package.json`. |
-| npm | Bundled with Node.js; used for the (dependency-free) install step. |
+| Node.js | A currently supported Node.js LTS release — for example, Node.js 22 LTS or 24 LTS (current as of July 2026 per the [official Node.js release schedule](https://nodejs.org/en/about/previous-releases)); verified on Node.js 22.x. The project does not pin an engine version in `package.json` (Source: package.json:1-11). |
+| npm | Bundled with the Node.js runtime (see the [Node.js download page](https://nodejs.org/en/download)); used only for the (dependency-free) install step (Source: package-lock.json:1-13). |
 
-> The project declares no `engines` field in `package.json`, so any reasonably current Node.js LTS runtime is sufficient.
+> The project declares no `engines` field in `package.json` (Source: package.json:1-11), so any currently supported Node.js LTS runtime is sufficient. Consult the [official Node.js release schedule](https://nodejs.org/en/about/previous-releases) for the current list of supported LTS versions.
 
 ## Installation
 
