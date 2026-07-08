@@ -1,7 +1,7 @@
 /**
- * @fileoverview Minimal HTTP server that returns a constant "Hello, World!"
- * response for every request. Built exclusively on the Node.js core `http`
- * module with zero third-party dependencies.
+ * @fileoverview The `hello_world` minimal HTTP server that returns a constant
+ * "Hello, World!" response for every request. Built exclusively on the Node.js
+ * core `http` module with zero third-party dependencies.
  */
 const http = require('http');
 
