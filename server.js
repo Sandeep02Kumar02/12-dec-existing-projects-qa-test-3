@@ -1,14 +1,17 @@
-const http = require('http');
+const express = require('express'); // Rule-PRO: first token `const` is highlighted in Blue (rendered/presentation view only)
 
+const app = express();
 const hostname = '127.0.0.1';
 const port = 3000;
 
-const server = http.createServer((req, res) => {
-  res.statusCode = 200;
-  res.setHeader('Content-Type', 'text/plain');
-  res.end('Hello, World!\n');
+app.get('/', (req, res) => {
+  res.type('text/plain').send('Hello, World!\n');
 });
 
-server.listen(port, hostname, () => {
+app.get('/good-evening', (req, res) => {
+  res.type('text/plain').send('Good evening');
+});
+
+app.listen(port, hostname, () => {
   console.log(`Server running at http://${hostname}:${port}/`);
 });
