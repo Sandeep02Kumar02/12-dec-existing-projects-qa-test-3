@@ -1,6 +1,6 @@
 # hello_world — Hello World HTTP Server
 
-A minimal Node.js HTTP server that returns a constant `Hello, World!` response for every request the Node.js HTTP parser accepts (Source: server.js:1-42).
+A minimal Node.js HTTP server that returns a constant `Hello, World!` response for every request (Source: server.js:1-42).
 
 ## Table of Contents
 
@@ -20,13 +20,13 @@ A minimal Node.js HTTP server that returns a constant `Hello, World!` response f
 
 ## Overview
 
-`hello_world` is a minimal HTTP server built exclusively on the Node.js core `http` module (Source: server.js:6). It listens on the loopback interface and responds to **every** incoming request the Node.js HTTP parser accepts — regardless of HTTP method or path — with an HTTP `200` status, a `text/plain` content type, and the body `Hello, World!\n` (Source: server.js:28-32); requests the parser rejects never reach the handler (see [Platform-Level Exceptions](#platform-level-exceptions)). Per the HTTP specification, a `HEAD` request receives the same status and header but no body (see [API Documentation](#api-documentation) for details). The project has **zero third-party dependencies** (Source: package-lock.json). It serves as a minimal reference implementation of a Node.js HTTP server.
+`hello_world` is a minimal HTTP server built exclusively on the Node.js core `http` module (Source: server.js:6). It listens on the loopback interface and responds to **every** incoming request — regardless of HTTP method or path — with an HTTP `200` status, a `text/plain` content type, and the body `Hello, World!\n` (Source: server.js:28-32). Per the HTTP specification, a `HEAD` request receives the same status and header but no body (see [API Documentation](#api-documentation) for details). The project has **zero third-party dependencies** (Source: package-lock.json). It serves as a minimal reference implementation of a Node.js HTTP server.
 
 ## Features
 
 - **Single-file server** — the entire application lives in `server.js` (Source: server.js:1-42).
 - **Zero dependencies** — uses only the Node.js core `http` module; no external packages are installed (Source: server.js:6; package-lock.json).
-- **Constant plain-text response** — returns `200 OK` with the body `Hello, World!\n` for any method and any path the Node.js HTTP parser accepts (a `HEAD` request receives the same status and headers with no body, per the HTTP specification; parser-rejected requests are listed under [Platform-Level Exceptions](#platform-level-exceptions)); the request is never inspected (Source: server.js:28-32).
+- **Constant plain-text response** — returns `200 OK` with the body `Hello, World!\n` for any method and any path (a `HEAD` request receives the same status and headers with no body, per the HTTP specification); the request is never inspected (Source: server.js:28-32).
 - **Loopback binding** — listens on `127.0.0.1:3000` (Source: server.js:12, server.js:17).
 
 ## Tech Stack
@@ -75,7 +75,7 @@ Server running at http://127.0.0.1:3000/
 
 ## API Documentation
 
-The server exposes a single behavior: the request handler runs identically for **every** request the Node.js HTTP parser accepts. It does not inspect the request, so the HTTP method, path, query string, and body are all ignored (Source: server.js:28-32). Every response carries an HTTP `200` status and a `Content-Type: text/plain` header; every method except `HEAD` also returns the `Hello, World!\n` body (see the `HEAD` note below). Requests the parser rejects are answered by the Node.js runtime before the handler runs (see [Platform-Level Exceptions](#platform-level-exceptions)).
+The server exposes a single behavior: the request handler runs identically for **every** request. It does not inspect the request, so the HTTP method, path, query string, and body are all ignored (Source: server.js:28-32). Every response carries an HTTP `200` status and a `Content-Type: text/plain` header; every method except `HEAD` also returns the `Hello, World!\n` body (see the `HEAD` note below).
 
 ### Endpoint Reference
 
@@ -86,8 +86,6 @@ The server exposes a single behavior: the request handler runs identically for *
 _Source: server.js:28-32_
 
 > **`HEAD` requests:** A `HEAD` response returns the same `200` status and `Content-Type: text/plain` header as the other methods, but with **no message body** and **no `Content-Length`** header. The request handler is identical for every method (Source: server.js:28-32); per the HTTP specification, the Node.js `http` runtime omits the body — and the `Content-Length` derived from it — from `HEAD` responses. All other methods (`GET`, `POST`, `PUT`, `DELETE`, `PATCH`, …) return the full `Hello, World!\n` body with `Content-Length: 14`. Verify with `curl -I http://127.0.0.1:3000/`.
-
-> **Parser-level exceptions:** The `ANY` / `/*` row above covers every request the Node.js HTTP parser accepts. A request whose method token the parser does not recognize, or whose request line and headers exceed Node's default header-size limit, is answered by the Node.js runtime with a `400` or `431` before the request handler is reached (Source: server.js:28-32). Both cases, their exact responses, and the sizes that still return `200` are listed under [Platform-Level Exceptions](#platform-level-exceptions).
 
 ### Example Request
 
@@ -121,27 +119,6 @@ sequenceDiagram
     S-->>C: 200 OK — "Hello, World!"
 ```
 
-_The diagram depicts a request accepted by the Node.js HTTP parser and passed to the handler (Source: server.js:28-32); for the requests the parser rejects instead, see [Platform-Level Exceptions](#platform-level-exceptions)._
-
-### Platform-Level Exceptions
-
-The Node.js HTTP parser validates the request line and headers before the request handler is invoked (Source: server.js:28-32). Two classes of request are answered by the Node.js runtime itself, and in both cases the request handler never runs:
-
-| Request | Response | Handler invoked |
-|---------|----------|-----------------|
-| A method token the parser does not recognize — it accepts only the tokens in [`http.METHODS`](https://nodejs.org/api/http.html#httpmethods) (35 on Node.js 22.x, among them `GET`, `POST`, `PUT`, `DELETE`, `PATCH`, `HEAD`, `OPTIONS`), and method tokens are case-sensitive, so `get` is not `GET`. Example: `curl -X FROBNICATE http://127.0.0.1:3000/` or `curl -X get http://127.0.0.1:3000/` | `HTTP/1.1 400 Bad Request` with a single `Connection: close` header — no message body and no `Content-Type` header | No |
-| A request line plus headers larger than Node's default [`http.maxHeaderSize`](https://nodejs.org/api/http.html#httpmaxheadersize) of `16384` bytes (16 KiB). Example: a URL path of 16,500 characters, or one request header with a 20,000-byte value | `HTTP/1.1 431 Request Header Fields Too Large` with a single `Connection: close` header — empty message body | No |
-
-The `16384`-byte ceiling is a Node.js runtime default, changed only through the runtime's own `--max-http-header-size` flag. It is not an application setting: `server.js` exposes no configuration surface — `hostname` and `port` are hard-coded constants (Source: server.js:12, server.js:17).
-
-The limit applies to the request line and headers only, not to the request body or to the number of headers. Each of the following returns the documented `200` / `text/plain` / `Content-Length: 14` / `Hello, World!\n` response:
-
-- a URL path of 8,000 characters,
-- 200 distinct small request headers,
-- a 10 MB request body.
-
-Either rejection closes only that connection: the next request receives the documented `200` response (Source: server.js:28-32).
-
 ## How It Works
 
 A construct-by-construct walkthrough of `server.js`:
@@ -149,7 +126,7 @@ A construct-by-construct walkthrough of `server.js`:
 1. **Import the HTTP module** — `const http = require('http');` loads the Node.js core `http` module, the only module the server needs (Source: server.js:6).
 2. **Define the host constant** — `const hostname = '127.0.0.1';` sets the loopback interface the server binds to (Source: server.js:12).
 3. **Define the port constant** — `const port = 3000;` sets the TCP port the server listens on (Source: server.js:17).
-4. **Create the server with a request handler** — `http.createServer((req, res) => { ... })` registers a callback that runs for every request the Node.js HTTP parser accepts (Source: server.js:28-32); requests the parser rejects are answered before the callback runs (see [Platform-Level Exceptions](#platform-level-exceptions)). Inside the handler:
+4. **Create the server with a request handler** — `http.createServer((req, res) => { ... })` registers a callback that runs for every request (Source: server.js:28-32). Inside the handler:
    - `res.statusCode = 200;` sets the HTTP status to `200 OK` (Source: server.js:29).
    - `res.setHeader('Content-Type', 'text/plain');` sets the response content type (Source: server.js:30).
    - `res.end('Hello, World!\n');` writes the response body and ends the response (Source: server.js:31).
