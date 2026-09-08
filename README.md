@@ -184,7 +184,7 @@ Restart=always
 WantedBy=multi-user.target
 ```
 
-Replace `/path/to` with the directory holding `server.js`, and create the unprivileged account the unit runs as before enabling it (for example, `useradd --system --no-create-home --shell /usr/sbin/nologin hello_world`). A unit with no `User=`/`Group=` runs the service as `root`; the server needs no elevated privileges because port `3000` is outside the privileged range below 1024 (Source: server.js:17), so a dedicated unprivileged account is enough, and `NoNewPrivileges=true` stops the process gaining any. Install the file as `/etc/systemd/system/hello_world.service`, then run `systemctl daemon-reload` and `systemctl enable --now hello_world`: `Restart=always` covers crashes, and `enable` is what starts the unit at boot.
+Replace `/path/to` with the directory holding `server.js`, and create the unprivileged account the unit runs as before enabling it (for example, `useradd --system --no-create-home --shell /usr/sbin/nologin hello_world`). A unit with no `User=`/`Group=` runs the service as `root`; `NoNewPrivileges=true` prevents the process from acquiring additional privileges. Install the file as `/etc/systemd/system/hello_world.service`, then run `systemctl daemon-reload` and `systemctl enable --now hello_world`: `Restart=always` covers crashes, and `enable` is what starts the unit at boot.
 
 **Using a container (Dockerfile sketch):**
 
@@ -197,7 +197,7 @@ EXPOSE 3000
 CMD ["node", "server.js"]
 ```
 
-The `COPY` names only the application files. The repository root also holds the unrelated fixtures listed under [Project Structure](#project-structure) — `LoginTest.java`, `industry.csv`, `test.py.txt`, `test.txt.txt`, `100Pages.pdf`, `demo.jpg` and `sample.doc` — plus the `.git` history, and the repository contains no `.dockerignore` or `.gitignore` to filter them, so `COPY . .` would copy about 11.7 MB of unrelated content and the full Git history into the image. Broadening the copy therefore requires adding a `.dockerignore` that excludes those fixtures and `.git`. Read the loopback caveat below before publishing the port — `EXPOSE 3000` and `docker run -p 3000:3000` are not sufficient on their own.
+The `COPY` names only the application files. The repository root also holds the unrelated fixtures listed under [Project Structure](#project-structure) — `LoginTest.java`, `industry.csv`, `test.py.txt`, `test.txt.txt`, `100Pages.pdf`, `demo.jpg` and `sample.doc` — plus the `.git` history, and the repository contains no `.dockerignore` or `.gitignore` to filter them. A build that copies the whole context needs a `.dockerignore` excluding those fixtures and `.git`. Read the loopback caveat below before publishing the port — `EXPOSE 3000` and `docker run -p 3000:3000` are not sufficient on their own.
 
 > **⚠️ Loopback binding caveat:** The server binds to `127.0.0.1` (Source: server.js:12), so it is reachable **only from the local host** — the machine, or in a container the container itself, that the process runs on — and will not accept traffic from other machines as-is. To expose it externally, either:
 >
