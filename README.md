@@ -1,6 +1,6 @@
 # hello_world — Hello World HTTP Server
 
-A minimal Node.js HTTP server that returns a constant `Hello, World!` response for every request (Source: server.js:1-42).
+A minimal Node.js HTTP server that returns a constant `Hello, World!` response for every request the Node.js runtime passes to it (Source: server.js:1-42).
 
 ## Table of Contents
 
@@ -20,13 +20,13 @@ A minimal Node.js HTTP server that returns a constant `Hello, World!` response f
 
 ## Overview
 
-`hello_world` is a minimal HTTP server built exclusively on the Node.js core `http` module (Source: server.js:6). It listens on the loopback interface and responds to **every** incoming request — regardless of HTTP method or path — with an HTTP `200` status, a `text/plain` content type, and the body `Hello, World!\n` (Source: server.js:28-32). Per the HTTP specification, a `HEAD` request receives the same status and header but no body (see [API Documentation](#api-documentation) for details). The project has **zero third-party dependencies** (Source: package-lock.json). It serves as a minimal reference implementation of a Node.js HTTP server.
+`hello_world` is a minimal HTTP server built exclusively on the Node.js core `http` module (Source: server.js:6). It listens on the loopback interface and responds to **every** incoming request the Node.js runtime passes to it — regardless of HTTP method or path — with an HTTP `200` status, a `text/plain` content type, and the body `Hello, World!\n` (Source: server.js:28-32); a small number of requests are answered or closed by the Node.js runtime before the handler is reached (see [Platform-Level Exceptions](#platform-level-exceptions)). Per the HTTP specification, a `HEAD` request receives the same status and header but no body (see [API Documentation](#api-documentation) for details). The project has **zero third-party dependencies** (Source: package-lock.json). It serves as a minimal reference implementation of a Node.js HTTP server.
 
 ## Features
 
 - **Single-file server** — the entire application lives in `server.js` (Source: server.js:1-42).
 - **Zero dependencies** — uses only the Node.js core `http` module; no external packages are installed (Source: server.js:6; package-lock.json).
-- **Constant plain-text response** — returns `200 OK` with the body `Hello, World!\n` for any method and any path (a `HEAD` request receives the same status and headers with no body, per the HTTP specification); the request is never inspected (Source: server.js:28-32).
+- **Constant plain-text response** — returns `200 OK` with the body `Hello, World!\n` for any method and any path (a `HEAD` request receives the same status and headers with no body, per the HTTP specification; the requests the Node.js runtime intercepts first are listed under [Platform-Level Exceptions](#platform-level-exceptions)); the request is never inspected (Source: server.js:28-32).
 - **Loopback binding** — listens on `127.0.0.1:3000` (Source: server.js:12, server.js:17).
 
 ## Tech Stack
@@ -75,7 +75,7 @@ Server running at http://127.0.0.1:3000/
 
 ## API Documentation
 
-The server exposes a single behavior: the request handler runs identically for **every** request. It does not inspect the request, so the HTTP method, path, query string, and body are all ignored (Source: server.js:28-32). Every response carries an HTTP `200` status and a `Content-Type: text/plain` header; every method except `HEAD` also returns the `Hello, World!\n` body (see the `HEAD` note below).
+The server exposes a single behavior: the request handler runs identically for **every** request the Node.js runtime passes to it. It does not inspect the request, so the HTTP method, path, query string, and body are all ignored (Source: server.js:28-32). Every response carries an HTTP `200` status and a `Content-Type: text/plain` header; every method except `HEAD` also returns the `Hello, World!\n` body (see the `HEAD` note below). A small number of requests are intercepted by the Node.js runtime before the handler runs (see [Platform-Level Exceptions](#platform-level-exceptions)).
 
 ### Endpoint Reference
 
@@ -85,7 +85,9 @@ The server exposes a single behavior: the request handler runs identically for *
 
 _Source: server.js:28-32_
 
-> **`HEAD` requests:** A `HEAD` response returns the same `200` status and `Content-Type: text/plain` header as the other methods, but with **no message body** and **no `Content-Length`** header. The request handler is identical for every method (Source: server.js:28-32); per the HTTP specification, the Node.js `http` runtime omits the body — and the `Content-Length` derived from it — from `HEAD` responses. All other methods (`GET`, `POST`, `PUT`, `DELETE`, `PATCH`, …) return the full `Hello, World!\n` body with `Content-Length: 14`. Verify with `curl -I http://127.0.0.1:3000/`.
+> **`HEAD` requests:** A `HEAD` response returns the same `200` status and `Content-Type: text/plain` header as the other methods, but with **no message body** and **no `Content-Length`** header. The request handler is identical for every method (Source: server.js:28-32); per the HTTP specification, the Node.js `http` runtime omits the body — and the `Content-Length` derived from it — from `HEAD` responses. All other methods (`GET`, `POST`, `PUT`, `DELETE`, `PATCH`, …) return the full `Hello, World!\n` body, and how those 14 bytes are delimited follows the request's HTTP version rather than its method, because the handler sends the body without setting a `Content-Length` header of its own (Source: server.js:28-32): an HTTP/1.1 request receives `Content-Length: 14` — alongside `Connection: keep-alive`, or alongside `Connection: close` when the client asks to close the connection — while an HTTP/1.0 request receives the same 14 bytes delimited by `Connection: close` and **no `Content-Length`** header at all, even if it asks for keep-alive. Verify the `HEAD` case with `curl -I http://127.0.0.1:3000/` and the HTTP/1.0 case with `curl --http1.0 -i http://127.0.0.1:3000/`.
+
+> **Runtime-level exceptions:** The `ANY` / `/*` row above covers every request the Node.js runtime passes to the handler. Some requests are disposed of by the Node.js runtime itself without reaching the handler; the principal cases are a request the Node.js HTTP parser rejects (a malformed request line or a malformed header section), an HTTP/1.1 request that carries no `Host` header, a request whose request line plus headers exceed Node's default header-size limit, and a `CONNECT` request. `server.js` registers only the request listener above, with no [`'clientError'`](https://nodejs.org/docs/latest-v22.x/api/http.html#event-clienterror) or [`'connect'`](https://nodejs.org/docs/latest-v22.x/api/http.html#event-connect_1) handler anywhere in the file (Source: server.js:1-42). Those cases, their exact responses, and the sizes and request shapes that still return `200` are listed under [Platform-Level Exceptions](#platform-level-exceptions).
 
 ### Example Request
 
@@ -106,7 +108,7 @@ Content-Length: 14
 Hello, World!
 ```
 
-The response body `Hello, World!\n` is 14 bytes, which is reflected by `Content-Length: 14` (Source: server.js:31).
+The response body `Hello, World!\n` is 14 bytes, which the HTTP/1.1 response above reflects as `Content-Length: 14` (Source: server.js:31); an HTTP/1.0 request receives the same 14 bytes with `Connection: close` and no `Content-Length` header, as described in the `HEAD` and response-framing note under [Endpoint Reference](#endpoint-reference).
 
 ### Request Lifecycle
 
@@ -118,6 +120,23 @@ sequenceDiagram
     S->>S: statusCode = 200#59; Content-Type text/plain
     S-->>C: 200 OK — "Hello, World!"
 ```
+
+_The diagram depicts a request the Node.js runtime passes to the handler (Source: server.js:28-32); for the requests it intercepts first, see [Platform-Level Exceptions](#platform-level-exceptions)._
+
+### Platform-Level Exceptions
+
+The Node.js runtime parses and routes each request before the handler runs, so a small number of requests never reach the application. `server.js` contains a single `request` listener that inspects nothing (Source: server.js:28-32) and registers no [`'clientError'`](https://nodejs.org/docs/latest-v22.x/api/http.html#event-clienterror) or [`'connect'`](https://nodejs.org/docs/latest-v22.x/api/http.html#event-connect_1) handler and no `maxHeaderSize` server option (Source: server.js:1-42), so Node's own defaults apply. The table below lists the principal cases rather than every request shape the Node.js parser rejects; each row was observed on Node.js 22.x.
+
+| Request | Response | Handler invoked |
+|---------|----------|-----------------|
+| A request the Node.js HTTP parser rejects, whether the fault is in the request line or in the header section. A request line is rejected for a method token the parser does not recognize (it accepts only the tokens in [`http.METHODS`](https://nodejs.org/docs/latest-v22.x/api/http.html#httpmethods), 35 on Node.js 22.x, and they are case-sensitive, so `get` is not `GET`), for an unsupported HTTP version, or for a malformed request target such as an empty one. Examples: `curl -X FROBNICATE http://127.0.0.1:3000/`, `curl -X get http://127.0.0.1:3000/`, or a raw `GET / HTTP/9.9` request line. A header section is rejected for an invalid character in a header name, a NUL byte in a header value, a duplicate, negative or non-numeric `Content-Length`, a `Content-Length` sent together with a `Transfer-Encoding`, an obs-fold continuation line, or bare-LF line endings | `HTTP/1.1 400 Bad Request` with a single `Connection: close` header — no message body and no `Content-Type` header | No |
+| An HTTP/1.1 request that carries no `Host` header, which [RFC 9112 §3.2](https://www.rfc-editor.org/rfc/rfc9112.html#section-3.2) requires a server to answer with `400`. Ordinary HTTP/1.1 clients — `curl`, browsers, `fetch`, Node's own client — always send `Host`, so reaching this case means removing it deliberately: `curl -H 'Host:' http://127.0.0.1:3000/`, or a raw `GET / HTTP/1.1` request line with no header lines at all. `Host` is not required on HTTP/1.0, so the same omission over that version — `curl --http1.0 -H 'Host:' -i http://127.0.0.1:3000/` — reaches the handler and returns the usual `200` with the body | `HTTP/1.1 400 Bad Request` with three headers, in this order — `Connection: close`, `Date`, `Transfer-Encoding: chunked` — followed by an empty chunked body (the `0` terminator and nothing else); 117 bytes in total. A `HEAD` request in the same state returns the same status line with the `Connection` and `Date` headers only, 84 bytes, with no `Transfer-Encoding` header and no body | No |
+| A request line plus headers larger than [`http.maxHeaderSize`](https://nodejs.org/docs/latest-v22.x/api/http.html#httpmaxheadersize), which defaults to `16384` bytes (16 KiB). Examples: a URL path of 16,500 characters, or one request header with a 20,000-byte value | `HTTP/1.1 431 Request Header Fields Too Large` with a single `Connection: close` header — empty message body | No |
+| A `CONNECT` request. The token is one of the 35 in `http.METHODS`, but Node.js routes it to the server's [`'connect'`](https://nodejs.org/docs/latest-v22.x/api/http.html#event-connect_1) event rather than to `'request'`. Example: a raw `CONNECT 127.0.0.1:3000 HTTP/1.1` request line | The connection is closed with **no response at all** — zero bytes are returned | No |
+
+An upgrade request is **not** intercepted: a request carrying `Connection: Upgrade` and, for example, `Upgrade: websocket` reaches the handler and receives the same `200` response as any other request; `server.js` registers no [`'upgrade'`](https://nodejs.org/docs/latest-v22.x/api/http.html#event-upgrade_1) listener either (Source: server.js:1-42).
+
+The `400` and `431` rejections close the connection, and the next request on a fresh connection is served normally with `200`. Requests that stay under the ceiling are unaffected — a 16,000-character path, an 8,000-character query string, or a 16,000-byte header value still returns `200`. So do request shapes that look irregular but that the parser accepts: duplicate `Host` headers, an empty `Host` header value, an unrecognized transfer coding such as `Transfer-Encoding: gzipx`, an `OPTIONS *` request, an absolute-form request target such as `GET http://example.com/x HTTP/1.1`, and a stray CRLF ahead of the request line each reach the handler and receive the same `200` and body. The `16384`-byte ceiling is a Node.js default, adjustable through the runtime's `--max-http-header-size` flag or per server through the [`maxHeaderSize` option of `http.createServer`](https://nodejs.org/docs/latest-v22.x/api/http.html#httpcreateserveroptions-requestlistener); `server.js` passes no options to `http.createServer` (Source: server.js:28). The parser-rejection `400` and the `431` are Node's default [`'clientError'`](https://nodejs.org/docs/latest-v22.x/api/http.html#event-clienterror) handling, and the zero-byte close of a `CONNECT` connection is its default for a server with no [`'connect'`](https://nodejs.org/docs/latest-v22.x/api/http.html#event-connect_1) listener; registering those handlers reshapes those responses, and this server registers neither (Source: server.js:1-42). The missing-`Host` `400` is not part of that handling: the runtime answers it before the `'clientError'` event is emitted, so it keeps the 117-byte shape above even on a server that does register a `'clientError'` handler (observed on Node.js 22.x). Beyond these runtime settings the server exposes no configuration surface: `hostname` and `port` are hard-coded constants (Source: server.js:12, server.js:17).
 
 ## How It Works
 
@@ -134,15 +153,18 @@ A construct-by-construct walkthrough of `server.js`:
 
 ## Deployment
 
-For anything beyond local development, run the server under a process manager or in a container so that it restarts on failure and survives reboots. The examples below are generic.
+For anything beyond local development, run the server under a process manager or in a container so that it restarts after a crash and, once the platform's boot hook is installed, comes back after a reboot. The examples below are generic.
 
 **Using pm2:**
 
 ```bash
 npm install -g pm2
 pm2 start server.js --name hello_world
+pm2 startup
 pm2 save
 ```
+
+`pm2 start` gives crash restarts immediately; reboot survival needs the last two commands together. `pm2 startup` detects the init system and generates the boot hook — run as an unprivileged user it prints a `sudo env PATH=... pm2 startup ...` command that must then be executed with root privileges to finish installing it — and `pm2 save` writes the current process list to `~/.pm2/dump.pm2` for that hook to resurrect at boot. `pm2 save` on its own only records the process list — with no startup hook installed, nothing brings pm2 or the server back after a reboot.
 
 **Using systemd (unit sketch):**
 
@@ -152,28 +174,38 @@ Description=hello_world HTTP server
 After=network.target
 
 [Service]
+WorkingDirectory=/path/to
 ExecStart=/usr/bin/node /path/to/server.js
+User=hello_world
+Group=hello_world
+NoNewPrivileges=true
 Restart=always
 
 [Install]
 WantedBy=multi-user.target
 ```
 
+Replace `/path/to` with the directory holding `server.js`, and create the unprivileged account the unit runs as before enabling it (for example, `useradd --system --no-create-home --shell /usr/sbin/nologin hello_world`). A unit with no `User=`/`Group=` runs the service as `root`; `NoNewPrivileges=true` prevents the process from acquiring additional privileges. Install the file as `/etc/systemd/system/hello_world.service`, then run `systemctl daemon-reload` and `systemctl enable --now hello_world`: `Restart=always` covers crashes, and `enable` is what starts the unit at boot.
+
 **Using a container (Dockerfile sketch):**
 
 ```dockerfile
 FROM node:22-alpine
 WORKDIR /app
-COPY . .
+COPY server.js package.json package-lock.json ./
 RUN npm install
 EXPOSE 3000
 CMD ["node", "server.js"]
 ```
 
-> **⚠️ Loopback binding caveat:** The server binds to `127.0.0.1` (Source: server.js:12), so it is reachable **only from the local host** and will not accept traffic from other machines as-is. To expose it externally, either:
+The `COPY` names only the application files. The repository root also holds the unrelated fixtures listed under [Project Structure](#project-structure) — `LoginTest.java`, `industry.csv`, `test.py.txt`, `test.txt.txt`, `100Pages.pdf`, `demo.jpg` and `sample.doc` — plus the `.git` history, and the repository contains no `.dockerignore` or `.gitignore` to filter them. A build that copies the whole context needs a `.dockerignore` excluding those fixtures and `.git`. Read the loopback caveat below before publishing the port — `EXPOSE 3000` and `docker run -p 3000:3000` are not sufficient on their own.
+
+> **⚠️ Loopback binding caveat:** The server binds to `127.0.0.1` (Source: server.js:12), so it is reachable **only from the local host** — the machine, or in a container the container itself, that the process runs on — and will not accept traffic from other machines as-is. To expose it externally, either:
 >
 > - place it behind a reverse proxy (for example, Nginx) that listens on a public interface and forwards to `127.0.0.1:3000`, or
 > - change the bind host in `server.js` (for example, to `0.0.0.0`).
+>
+> **In a container the same bind also blocks published ports:** traffic from `docker run -p 3000:3000` is forwarded to the container's own network interface, not to its loopback interface, and a `127.0.0.1` listener does not accept it — the connection is refused or reset even though `EXPOSE 3000` is declared. Publishing a port therefore needs the bind-host change above (for example, to `0.0.0.0`) applied inside the image.
 >
 > The port is fixed at `3000` in source (Source: server.js:17). Both host and port are hard-coded module constants — there are no environment variables or configuration files — so changing them means editing `server.js`. Do not edit `package.json` for this.
 
@@ -186,6 +218,7 @@ CMD ["node", "server.js"]
 ├── package-lock.json  # npm lockfile (zero dependencies)
 ├── README.md          # This documentation
 ├── DECISIONS.md       # Decision log (rationale)
+├── blitzy/            # Generated project documentation — not part of this app
 ├── LoginTest.java     # Unrelated test fixture — not part of this app
 ├── industry.csv       # Unrelated reference dataset — not part of this app
 ├── test.py.txt        # Unrelated fixture (empty) — not part of this app
@@ -195,7 +228,7 @@ CMD ["node", "server.js"]
 └── sample.doc         # Unrelated binary fixture — not part of this app
 ```
 
-Only `server.js` carries the documented application logic. The Java, CSV, text, and binary files (`LoginTest.java`, `industry.csv`, `test.py.txt`, `test.txt.txt`, `100Pages.pdf`, `demo.jpg`, `sample.doc`) are **unrelated test fixtures and are not part of the documented application**.
+Only `server.js` carries the documented application logic. The Java, CSV, text, and binary files (`LoginTest.java`, `industry.csv`, `test.py.txt`, `test.txt.txt`, `100Pages.pdf`, `demo.jpg`, `sample.doc`) are **unrelated test fixtures and are not part of the documented application**, and the `blitzy/` directory holds generated project documentation rather than application code. None of them is referenced by `server.js` (Source: server.js:1-42).
 
 ## Testing
 
