@@ -85,7 +85,7 @@ The server exposes a single behavior: the request handler runs identically for *
 
 _Source: server.js:28-32_
 
-> **`HEAD` requests:** A `HEAD` response returns the same `200` status and `Content-Type: text/plain` header as the other methods, but with **no message body** and **no `Content-Length`** header. The request handler is identical for every method (Source: server.js:28-32); per the HTTP specification, the Node.js `http` runtime omits the body — and the `Content-Length` derived from it — from `HEAD` responses. All other methods (`GET`, `POST`, `PUT`, `DELETE`, `PATCH`, …) return the full `Hello, World!\n` body with `Content-Length: 14`. Verify with `curl -I http://127.0.0.1:3000/`.
+> **`HEAD` requests:** A `HEAD` response returns the same `200` status and `Content-Type: text/plain` header as the other methods, but with **no message body** and **no `Content-Length`** header. The request handler is identical for every method (Source: server.js:28-32); per the HTTP specification, the Node.js `http` runtime omits the body — and the `Content-Length` derived from it — from `HEAD` responses. All other methods (`GET`, `POST`, `PUT`, `DELETE`, `PATCH`, …) return the full `Hello, World!\n` body, and how those 14 bytes are delimited follows the request's HTTP version rather than its method, because the handler sends the body without setting a `Content-Length` header of its own (Source: server.js:28-32): an HTTP/1.1 request receives `Content-Length: 14` — alongside `Connection: keep-alive`, or alongside `Connection: close` when the client asks to close the connection — while an HTTP/1.0 request receives the same 14 bytes delimited by `Connection: close` and **no `Content-Length`** header at all, even if it asks for keep-alive. Verify the `HEAD` case with `curl -I http://127.0.0.1:3000/` and the HTTP/1.0 case with `curl --http1.0 -i http://127.0.0.1:3000/`.
 
 > **Runtime-level exceptions:** The `ANY` / `/*` row above covers every request the Node.js runtime passes to the handler. A malformed request line, a request whose headers exceed Node's default header-size limit, and a `CONNECT` request are each disposed of by the Node.js runtime itself without reaching the handler; `server.js` registers only the request listener above, with no [`'clientError'`](https://nodejs.org/docs/latest-v22.x/api/http.html#event-clienterror) or [`'connect'`](https://nodejs.org/docs/latest-v22.x/api/http.html#event-connect_1) handler anywhere in the file (Source: server.js:1-42). All three cases, their exact responses, and the sizes that still return `200` are listed under [Platform-Level Exceptions](#platform-level-exceptions).
 
@@ -108,7 +108,7 @@ Content-Length: 14
 Hello, World!
 ```
 
-The response body `Hello, World!\n` is 14 bytes, which is reflected by `Content-Length: 14` (Source: server.js:31).
+The response body `Hello, World!\n` is 14 bytes, which the HTTP/1.1 response above reflects as `Content-Length: 14` (Source: server.js:31); an HTTP/1.0 request receives the same 14 bytes with `Connection: close` and no `Content-Length` header, as described in the `HEAD` and response-framing note under [Endpoint Reference](#endpoint-reference).
 
 ### Request Lifecycle
 
