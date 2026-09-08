@@ -152,15 +152,18 @@ A construct-by-construct walkthrough of `server.js`:
 
 ## Deployment
 
-For anything beyond local development, run the server under a process manager or in a container so that it restarts on failure and survives reboots. The examples below are generic.
+For anything beyond local development, run the server under a process manager or in a container so that it restarts after a crash and, once the platform's boot hook is installed, comes back after a reboot. The examples below are generic.
 
 **Using pm2:**
 
 ```bash
 npm install -g pm2
 pm2 start server.js --name hello_world
+pm2 startup
 pm2 save
 ```
+
+`pm2 start` gives crash restarts immediately; reboot survival needs the last two commands together. `pm2 startup` detects the init system and generates the boot hook — run as an unprivileged user it prints a `sudo env PATH=... pm2 startup ...` command that must then be executed with root privileges to finish installing it — and `pm2 save` writes the current process list to `~/.pm2/dump.pm2` for that hook to resurrect at boot. `pm2 save` on its own only records the process list — with no startup hook installed, nothing brings pm2 or the server back after a reboot.
 
 **Using systemd (unit sketch):**
 
@@ -170,28 +173,38 @@ Description=hello_world HTTP server
 After=network.target
 
 [Service]
+WorkingDirectory=/path/to
 ExecStart=/usr/bin/node /path/to/server.js
+User=hello_world
+Group=hello_world
+NoNewPrivileges=true
 Restart=always
 
 [Install]
 WantedBy=multi-user.target
 ```
 
+Replace `/path/to` with the directory holding `server.js`, and create the unprivileged account the unit runs as before enabling it (for example, `useradd --system --no-create-home --shell /usr/sbin/nologin hello_world`). A unit with no `User=`/`Group=` runs the service as `root`; the server needs no elevated privileges because port `3000` is outside the privileged range below 1024 (Source: server.js:17), so a dedicated unprivileged account is enough, and `NoNewPrivileges=true` stops the process gaining any. Install the file as `/etc/systemd/system/hello_world.service`, then run `systemctl daemon-reload` and `systemctl enable --now hello_world`: `Restart=always` covers crashes, and `enable` is what starts the unit at boot.
+
 **Using a container (Dockerfile sketch):**
 
 ```dockerfile
 FROM node:22-alpine
 WORKDIR /app
-COPY . .
+COPY server.js package.json package-lock.json ./
 RUN npm install
 EXPOSE 3000
 CMD ["node", "server.js"]
 ```
 
-> **⚠️ Loopback binding caveat:** The server binds to `127.0.0.1` (Source: server.js:12), so it is reachable **only from the local host** and will not accept traffic from other machines as-is. To expose it externally, either:
+The `COPY` names only the application files. The repository root also holds the unrelated fixtures listed under [Project Structure](#project-structure) — `LoginTest.java`, `industry.csv`, `test.py.txt`, `test.txt.txt`, `100Pages.pdf`, `demo.jpg` and `sample.doc` — plus the `.git` history, and the repository contains no `.dockerignore` or `.gitignore` to filter them, so `COPY . .` would copy about 11.7 MB of unrelated content and the full Git history into the image. Broadening the copy therefore requires adding a `.dockerignore` that excludes those fixtures and `.git`. Read the loopback caveat below before publishing the port — `EXPOSE 3000` and `docker run -p 3000:3000` are not sufficient on their own.
+
+> **⚠️ Loopback binding caveat:** The server binds to `127.0.0.1` (Source: server.js:12), so it is reachable **only from the local host** — the machine, or in a container the container itself, that the process runs on — and will not accept traffic from other machines as-is. To expose it externally, either:
 >
 > - place it behind a reverse proxy (for example, Nginx) that listens on a public interface and forwards to `127.0.0.1:3000`, or
 > - change the bind host in `server.js` (for example, to `0.0.0.0`).
+>
+> **In a container the same bind also blocks published ports:** traffic from `docker run -p 3000:3000` is forwarded to the container's own network interface, not to its loopback interface, and a `127.0.0.1` listener does not accept it — the connection is refused or reset even though `EXPOSE 3000` is declared. Publishing a port therefore needs the bind-host change above (for example, to `0.0.0.0`) applied inside the image.
 >
 > The port is fixed at `3000` in source (Source: server.js:17). Both host and port are hard-coded module constants — there are no environment variables or configuration files — so changing them means editing `server.js`. Do not edit `package.json` for this.
 
